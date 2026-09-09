@@ -23,7 +23,7 @@ from emailapp.views import forward_mail,update_phone,profile,change_password,act
 from emailapp.views import delete_mail, restore_mail,delete_account,permanent_delete_mail
 from emailapp.views import edit_mail,logout_user, login_history
 from emailapp.views import verify_otp,mail_counts,send_draft,admin_generate_temp_password,admin_user_activity
-from emailapp.views import star_mail,admin_users,admin_unread_notification_count,admin_notifications,admin_mark_notification_read
+from emailapp.views import star_mail,admin_users,admin_unread_notification_count,admin_notifications,admin_mark_notification_read, quantum_hardware_bb84
 from django.conf import settings
 from django.conf.urls.static import static
 from emailapp.views import download_attachment,admin_generate_temp_password,admin_mark_all_notifications_read
@@ -143,6 +143,11 @@ path(
     "test-sns/",
     views.test_sns,
     name="test_sns"
+),
+path(
+    "quantum-hardware/bb84/",
+    views.quantum_hardware_bb84,
+    name="quantum_hardware_bb84"
 ),
 ]
 urlpatterns += static(

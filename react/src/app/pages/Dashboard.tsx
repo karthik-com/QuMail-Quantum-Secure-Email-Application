@@ -23,6 +23,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [emails, setEmails] = useState<any[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [quantumLoading, setQuantumLoading] = useState(false);
+  const [quantumResult, setQuantumResult] = useState<any>(null);
+  const [quantumError, setQuantumError] = useState("");
   const [mailCounts, setMailCounts] = useState({
     inbox: 0,
     sent: 0,
@@ -62,6 +65,46 @@ export default function Dashboard() {
       console.log(error);
     }
   };
+  const runQuantumHardwareValidation = async () => {
+  try {
+    setQuantumLoading(true);
+    setQuantumError("");
+    setQuantumResult(null);
+
+    const token = localStorage.getItem("access");
+
+    if (!token) {
+      setQuantumError("Authentication token not found. Please log in again.");
+      return;
+    }
+
+    const response = await fetch(
+      "http://127.0.0.1:8000/quantum-hardware/bb84/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Quantum validation failed.");
+    }
+
+    setQuantumResult(data.result);
+  } catch (error: any) {
+    console.error("Quantum hardware validation error:", error);
+    setQuantumError(
+      error.message || "Failed to run quantum hardware validation."
+    );
+  } finally {
+    setQuantumLoading(false);
+  }
+};
 
   const searchEmails = async (query: string) => {
     if (!query.trim()) {
@@ -123,11 +166,7 @@ export default function Dashboard() {
       const response = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // const data = await response.json();
-      // if (folder === "trash") {
-      //   console.log("TRASH DATA:", data);
-      // }
-      // console.log(data);
+      
       const data = await response.json();
 
       console.log(`📩 ${folder.toUpperCase()} RESPONSE:`, data);
@@ -283,8 +322,155 @@ export default function Dashboard() {
       </nav>
 
       {/* Main Content Area */}
-      <div className="flex pt-16" style={{ height: "calc(100vh - 4rem)" }}>
+      {/* <div className="flex pt-16" style={{ height: "calc(100vh - 4rem)" }}> */}
+      {/* Main Content Area */}
+      <div className="flex flex-col pt-16" style={{ height: "calc(100vh - 4rem)" }}>
+
+        {/* Quantum Hardware Validation */}
+        <div
+          className="mx-4 mt-4 mb-2 p-4 rounded-xl"
+          style={{
+            background: "#FFFDF9",
+            border: "1px solid #E6DDD2",
+            boxShadow: "0 2px 12px rgba(59,42,35,0.05)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2
+                className="text-sm font-semibold"
+                style={{
+                  color: "#3B2A23",
+                  fontFamily: "Orbitron, sans-serif",
+                }}
+              >
+                Quantum Hardware Validation
+              </h2>
+
+              <p
+                className="text-xs mt-1"
+                style={{
+                  color: "#7A6D63",
+                  fontFamily: "JetBrains Mono, monospace",
+                }}
+              >
+                Run BB84 key generation on real IBM Quantum hardware.
+              </p>
+            </div>
+
+            <button
+              onClick={runQuantumHardwareValidation}
+              disabled={quantumLoading}
+              className="px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200"
+              style={{
+                background: quantumLoading ? "#DCCFC0" : "#B89B5E",
+                color: "#FAF3E7",
+                cursor: quantumLoading ? "not-allowed" : "pointer",
+                fontFamily: "Orbitron, sans-serif",
+                letterSpacing: "0.08em",
+              }}
+            >
+              {quantumLoading ? "Running..." : "Run Validation"}
+            </button>
+          </div>
+
+          {/* Error */}
+          {quantumError && (
+            <div
+              className="mt-3 p-3 rounded-lg text-xs"
+              style={{
+                background: "#FCECEC",
+                border: "1px solid #E8B8B8",
+                color: "#9B3A3A",
+                fontFamily: "JetBrains Mono, monospace",
+              }}
+            >
+              {quantumError}
+            </div>
+          )}
+
+          {/* Result */}
+          {quantumResult && (
+            <div
+              className="mt-4 pt-4"
+              style={{ borderTop: "1px solid #E6DDD2" }}
+            >
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+
+                <div>
+                  <p className="text-xs" style={{ color: "#A89B91" }}>
+                    Backend
+                  </p>
+                  <p
+                    className="text-sm font-semibold mt-1"
+                    style={{ color: "#3B2A23" }}
+                  >
+                    {quantumResult.backend}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs" style={{ color: "#A89B91" }}>
+                    Job ID
+                  </p>
+                  <p
+                    className="text-xs font-semibold mt-1 truncate"
+                    title={quantumResult.job_id}
+                    style={{
+                      color: "#3B2A23",
+                      fontFamily: "JetBrains Mono, monospace",
+                    }}
+                  >
+                    {quantumResult.job_id}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs" style={{ color: "#A89B91" }}>
+                    Key Agreement
+                  </p>
+                  <p
+                    className="text-sm font-semibold mt-1"
+                    style={{
+                      color: quantumResult.key_agreement
+                        ? "#5C7A4D"
+                        : "#9B3A3A",
+                    }}
+                  >
+                    {quantumResult.key_agreement ? "✓ Success" : "✗ Failed"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs" style={{ color: "#A89B91" }}>
+                    Sifted Key
+                  </p>
+                  <p
+                    className="text-sm font-semibold mt-1"
+                    style={{ color: "#3B2A23" }}
+                  >
+                    {quantumResult.sifted_key_length} bits
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs" style={{ color: "#A89B91" }}>
+                    AES Key
+                  </p>
+                  <p
+                    className="text-sm font-semibold mt-1"
+                    style={{ color: "#3B2A23" }}
+                  >
+                    {quantumResult.aes_key_length} bits
+                  </p>
+                </div>
+
+              </div>
+            </div>
+          )}
+        </div>
         {/* Left Sidebar */}
+        <div className="flex flex-1 min-h-0">
         <aside
           className="w-64 flex-shrink-0 p-4 space-y-4 overflow-y-auto hide-scrollbar"
           style={{ borderRight: "1px solid #E6DDD2" }}
@@ -517,7 +703,7 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
-
+      </div>
       {/* Footer */}
       <footer
         className="py-4"
@@ -529,6 +715,7 @@ export default function Dashboard() {
         >
           &copy; Qumail Application 2026
         </p>
+        
       </footer>
     </div>
   );

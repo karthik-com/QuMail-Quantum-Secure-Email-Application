@@ -43,7 +43,10 @@ export default function Compose() {
     type: "success" | "info";
   } | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  type EncryptionMode = "simulation" | "ibm";
 
+  const [encryptionMode, setEncryptionMode] =
+  useState<EncryptionMode>("simulation");
   const handleSend = async () => {
     if (!quantumEncryption) {
       setNotification({ message: "Enable quantum encryption to send mail", type: "info" });
@@ -57,6 +60,7 @@ export default function Compose() {
       formData.append("receivers", to);
       formData.append("subject", subject);
       formData.append("message", body);
+      formData.append("encryption_mode", encryptionMode);
       if (attachment) formData.append("attachment", attachment);
 
       const response = await fetch("http://127.0.0.1:8000/sendMail/", {
@@ -308,42 +312,138 @@ export default function Compose() {
                 />
               </div>
 
-              {/* Quantum Encryption Toggle */}
-              <div
-                className="rounded-xl p-4 flex items-center justify-between"
-                style={{
-                  background: "rgba(184,155,94,0.07)",
-                  border: "1px solid rgba(184,155,94,0.25)",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <Lock className="w-5 h-5" style={{ color: "#B89B5E" }} />
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: "#3B2A23" }}>Quantum Encryption</p>
-                    <p className="text-xs" style={{ color: "#7A6D63", fontFamily: "JetBrains Mono, monospace" }}>
-                      End-to-end post-quantum cryptography enabled
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setQuantumEncryption(!quantumEncryption)}
-                  className="relative w-12 h-6 rounded-full transition-all duration-300"
-                  style={{
-                    background: quantumEncryption ? "#B89B5E" : "rgba(59,42,35,0.15)",
-                    border: quantumEncryption ? "1px solid rgba(184,155,94,0.5)" : "1px solid #DCCFC0",
-                    boxShadow: quantumEncryption ? "0 0 15px rgba(184,155,94,0.3)" : "none",
-                  }}
-                >
-                  <span
-                    className="absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300"
-                    style={{
-                      left: quantumEncryption ? "calc(100% - 22px)" : "2px",
-                      background: "#ffffff",
-                      boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                    }}
-                  />
-                </button>
-              </div>
+              
+<div
+  className="rounded-xl p-4"
+  style={{
+    background: "rgba(184,155,94,0.07)",
+    border: "1px solid rgba(184,155,94,0.25)",
+  }}
+>
+  {/* Quantum Encryption Header */}
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <Lock className="w-5 h-5" style={{ color: "#B89B5E" }} />
+
+      <div>
+        <p
+          className="text-sm font-medium"
+          style={{ color: "#3B2A23" }}
+        >
+          Quantum Encryption
+        </p>
+
+        <p
+          className="text-xs"
+          style={{
+            color: "#7A6D63",
+            fontFamily: "JetBrains Mono, monospace",
+          }}
+        >
+          End-to-end post-quantum cryptography enabled
+        </p>
+      </div>
+    </div>
+
+    {/* Encryption Toggle */}
+    <button
+      onClick={() =>
+        setQuantumEncryption(!quantumEncryption)
+      }
+      className="relative w-12 h-6 rounded-full transition-all duration-300"
+      style={{
+        background: quantumEncryption
+          ? "#B89B5E"
+          : "rgba(59,42,35,0.15)",
+        border: quantumEncryption
+          ? "1px solid rgba(184,155,94,0.5)"
+          : "1px solid #DCCFC0",
+        boxShadow: quantumEncryption
+          ? "0 0 15px rgba(184,155,94,0.3)"
+          : "none",
+      }}
+    >
+      <span
+        className="absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300"
+        style={{
+          left: quantumEncryption
+            ? "calc(100% - 22px)"
+            : "2px",
+          background: "#ffffff",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+        }}
+      />
+    </button>
+  </div>
+
+  {/* Encryption Method */}
+  <div className="mt-5 border-t pt-4">
+    <p
+      className="text-sm font-medium mb-3"
+      style={{ color: "#3B2A23" }}
+    >
+      Encryption Method
+    </p>
+
+    <div className="space-y-2">
+
+      {/* Qiskit Simulation */}
+      <label className="flex items-center gap-3 ${quantumEncryption ? 'cursor-pointer': 'cursor-not-allowed opacity-50'}">
+        <input
+          type="radio"
+          name="encryptionMode"
+          value="simulation"
+          checked={encryptionMode === "simulation"}
+          onChange={() =>
+            setEncryptionMode("simulation")
+          }
+          disabled={!quantumEncryption}
+        />
+
+        <span
+          className="text-sm"
+          style={{ color: "#3B2A23" }}
+        >
+          Qiskit BB84 Simulation
+        </span>
+      </label>
+
+      {/* IBM Quantum Hardware */}
+      <label className="flex items-center gap-3 ${quantumEncryption ? 'cursor-pointer': 'cursor-not-allowed opacity-50'}">
+        <input
+          type="radio"
+          name="encryptionMode"
+          value="ibm"
+          checked={encryptionMode === "ibm"}
+          onChange={() =>
+            setEncryptionMode("ibm")
+          }
+          disabled={!quantumEncryption}
+        />
+
+        <span
+          className="text-sm"
+          style={{ color: "#3B2A23" }}
+        >
+          IBM Quantum Hardware
+        </span>
+      </label>
+
+    </div>
+
+    {/* IBM Information */}
+    {encryptionMode === "ibm" && quantumEncryption && (
+      <p
+        className="mt-3 text-xs"
+        style={{ color: "#7A6D63" }}
+      >
+        Uses a real IBM Quantum processor to perform
+        the BB84 experiment. Sending may take longer
+        than the software simulation.
+      </p>
+    )}
+  </div>
+</div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">

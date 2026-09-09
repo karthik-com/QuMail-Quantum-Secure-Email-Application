@@ -161,8 +161,11 @@ def encrypt_message(message):
     )
 
     # Safety check
+    
     if len(shared_key_bits) == 0:
-        shared_key_bits = generate_bits(128)
+        raise ValueError(
+        "BB84 key generation failed: no shared key bits available."
+    )
 
     # ==========================================
     # Convert QKD key to AES key

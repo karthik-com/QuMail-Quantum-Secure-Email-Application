@@ -12,7 +12,6 @@ from channels.layers import get_channel_layer
 import os
 from asgiref.sync import async_to_sync
 from dotenv import load_dotenv
-
 from .models import AdminNotification, LoginActivity, UserProfile
 from .utils import encrypt_message
 from .utils import decrypt_message
@@ -21,15 +20,10 @@ import secrets
 import string
 import boto3
 from django.conf import settings
-
-import re
-
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
-from django.contrib.auth.models import User
-
-from .models import UserProfile
+import uuid
+from Crypto.Cipher import AES
+from quantum_hardware.ibm_bb84 import run_ibm_bb84
 
 
 @api_view(['POST'])
@@ -1018,28 +1012,32 @@ from .models import Email, UserProfile
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-
 def send_mail(request):
 
     sender = request.user
 
-    receiver_emails = request.data.get(
-        'receivers'
-    )
+    # =========================================================
+    # HANDLE RECEIVERS
+    # =========================================================
+
+    receiver_emails = request.data.get("receivers")
+
     if not receiver_emails:
-        return Response({
+        return Response(
+            {
+                "error": "Receivers required"
+            },
+            status=400
+        )
 
-        "error": "Receivers required"
-
-    }, status=400)
     # =========================================================
     # HANDLE SINGLE / MULTIPLE RECEIVERS
     # =========================================================
 
     if isinstance(receiver_emails, str):
 
-        # Frontend may send:
-        # "teju@qumail.io,Deep@qumail.io"
+        # Example:
+        # "teju@qumail.io,deep@qumail.io"
 
         receiver_emails = [
             email.strip()
@@ -1079,36 +1077,247 @@ def send_mail(request):
         receiver_emails
     )
 
-    subject = request.data.get('subject')
-
-    message = request.data.get('message')
-
+    subject = request.data.get("subject")
+    message = request.data.get("message")
     attachment = request.FILES.get("attachment")
 
-    
+    # =========================================================
+    # ENCRYPTION MODE
+    # =========================================================
 
-    # ✅ Encrypt Message
-    encrypted_data = encrypt_message(message)
+    encryption_mode = request.data.get(
+        "encryption_mode",
+        "simulation"
+    )
+
+    # =========================================================
+    # ENCRYPT MESSAGE
+    # =========================================================
+
+    if encryption_mode == "ibm":
+
+        print("\n")
+        print("=" * 60)
+        print("QUMAIL IBM QUANTUM EMAIL ENCRYPTION")
+        print("=" * 60)
+
+        print(
+            "\nStarting BB84 experiment on "
+            "real IBM Quantum hardware..."
+        )
+
+        try:
+
+            # Run BB84 on real IBM Quantum hardware
+            quantum_result = run_ibm_bb84()
+
+        except Exception as e:
+
+            print(
+                "\nIBM Quantum execution failed:"
+            )
+            print(str(e))
+
+            print("=" * 60)
+            print()
+
+            return Response(
+                {
+                    "error":
+                        "IBM Quantum BB84 execution failed.",
+                    "details": str(e)
+                },
+                status=500
+            )
+
+        # =====================================================
+        # DISPLAY QUANTUM RESULT IN TERMINAL
+        # =====================================================
+
+        print(
+            f"\nBackend       : "
+            f"{quantum_result['backend']}"
+        )
+
+        print(
+            f"Job ID        : "
+            f"{quantum_result['job_id']}"
+        )
+
+        print(
+            f"Key agreement : "
+            f"{quantum_result['key_agreement']}"
+        )
+
+        print(
+            f"Sifted key    : "
+            f"{len(quantum_result['bob_sifted_key'])} bits"
+        )
+
+        print(
+            f"AES key       : "
+            f"{quantum_result['aes_key_length']} bits"
+        )
+
+        # =====================================================
+        # VERIFY BB84 KEY AGREEMENT
+        # =====================================================
+
+        if not quantum_result["key_agreement"]:
+
+            print(
+                "\nERROR: BB84 key agreement failed."
+            )
+
+            print(
+                "Email will NOT be encrypted or sent."
+            )
+
+            print("=" * 60)
+            print()
+
+            return Response(
+                {
+                    "error":
+                        "IBM Quantum BB84 key agreement failed."
+                },
+                status=500
+            )
+
+        # =====================================================
+        # USE IBM-GENERATED AES KEY
+        # =====================================================
+
+        key = bytes.fromhex(
+            quantum_result["aes_key"]
+        )
+
+        # AES-GCM encryption
+        cipher = AES.new(
+            key,
+            AES.MODE_GCM
+        )
+
+        ciphertext, tag = (
+            cipher.encrypt_and_digest(
+                message.encode()
+            )
+        )
+
+        encrypted_data = {
+
+            "encrypted":
+                ciphertext.hex(),
+
+            "iv":
+                cipher.nonce.hex(),
+
+            "auth_tag":
+                tag.hex(),
+
+            "key_id":
+                str(uuid.uuid4()),
+
+            "key":
+                key.hex()
+        }
+
+        print(
+            "\nAES-GCM encryption : SUCCESS"
+        )
+
+        print(
+            "Email encryption   : SUCCESS"
+        )
+
+        print("=" * 60)
+        print()
+
+    else:
+
+        # =====================================================
+        # EXISTING QISKIT AER BB84 SIMULATION
+        # =====================================================
+
+        print("\n")
+        print(
+            "=" * 60
+        )
+
+        print(
+            "QUMAIL SOFTWARE BB84 EMAIL ENCRYPTION"
+        )
+
+        print(
+            "=" * 60
+        )
+
+        print(
+            "\nUsing Qiskit Aer BB84 simulation..."
+        )
+
+        try:
+
+            encrypted_data = encrypt_message(
+                message
+            )
+
+        except Exception as e:
+
+            print(
+                "\nBB84 simulation encryption failed:"
+            )
+            print(str(e))
+
+            print("=" * 60)
+            print()
+
+            return Response(
+                {
+                    "error":
+                        "Quantum encryption failed.",
+                    "details": str(e)
+                },
+                status=500
+            )
+
+        print(
+            "AES-GCM encryption : SUCCESS"
+        )
+
+        print(
+            "Email encryption   : SUCCESS"
+        )
+
+        print("=" * 60)
+        print()
+
+    # =========================================================
+    # ENCRYPT ATTACHMENT
+    # =========================================================
 
     encrypted_attachment_file = None
 
-    # ✅ Encrypt attachment if exists
     if attachment:
 
         file_data = attachment.read()
 
+        # Use the SAME AES key generated for
+        # the email message
         key = bytes.fromhex(
             encrypted_data["key"]
         )
 
-        encrypted_file_data = encrypt_file(
-            file_data,
-            key
+        encrypted_attachment_file = (
+            encrypt_file(
+                file_data,
+                key
+            )
         )
 
-        encrypted_attachment_file = (
-            encrypted_file_data
-        )
+    # =========================================================
+    # SAVE EMAIL FOR EACH VALID RECEIVER
+    # =========================================================
 
     saved_count = 0
 
@@ -1128,8 +1337,14 @@ def send_mail(request):
             user=receiver
         ).first()
 
+        # Do not send to deleted users
         if profile and profile.is_deleted:
+
             continue
+
+        # =====================================================
+        # CREATE EMAIL
+        # =====================================================
 
         email = Email.objects.create(
 
@@ -1141,28 +1356,38 @@ def send_mail(request):
 
             message=message,
 
-            encrypted_message=encrypted_data["encrypted"],
+            encrypted_message=
+                encrypted_data["encrypted"],
 
-            iv=encrypted_data["iv"],
+            iv=
+                encrypted_data["iv"],
 
-            auth_tag=encrypted_data["auth_tag"],
+            auth_tag=
+                encrypted_data["auth_tag"],
 
-            key_id=encrypted_data["key_id"],
+            key_id=
+                encrypted_data["key_id"],
 
-            key=encrypted_data["key"]
+            key=
+                encrypted_data["key"]
         )
 
-        if attachment and encrypted_attachment_file:
+        # =====================================================
+        # SAVE ENCRYPTED ATTACHMENT
+        # =====================================================
+
+        if (
+            attachment
+            and encrypted_attachment_file
+        ):
 
             email.attachment_iv = (
-
                 encrypted_attachment_file[
                     "iv"
                 ].hex()
             )
 
             email.attachment_auth_tag = (
-
                 encrypted_attachment_file[
                     "tag"
                 ].hex()
@@ -1179,7 +1404,6 @@ def send_mail(request):
                 encrypted_filename,
 
                 ContentFile(
-
                     encrypted_attachment_file[
                         "encrypted_file"
                     ]
@@ -1188,35 +1412,53 @@ def send_mail(request):
 
         saved_count += 1
 
+    # =========================================================
+    # NO VALID RECEIVERS
+    # =========================================================
+
     if saved_count == 0:
 
-        return Response({
+        return Response(
+            {
+                "error":
+                    "No valid receivers found"
+            },
+            status=400
+        )
 
-            "error": "No valid receivers found"
-
-        }, status=400)
+    # =========================================================
+    # SEND NOTIFICATION
+    # =========================================================
 
     channel_layer = get_channel_layer()
+
     async_to_sync(
-    channel_layer.group_send
-)(
+        channel_layer.group_send
+    )(
+        "notifications",
+        {
+            "type":
+                "send_notification",
 
-    "notifications",
+            "message":
+                f"📩 New Secure Mail from "
+                f"{sender.username}"
+        }
+    )
 
-    {
+    # =========================================================
+    # SUCCESS RESPONSE
+    # =========================================================
 
-        "type": "send_notification",
+    return Response(
+        {
+            "message":
+                "Mail saved successfully",
 
-        "message":
-
-        f"📩 New Secure Mail from {sender.username}"
-    }
-)
-
-    return Response({
-
-        "message": "Mail saved successfully"
-    })
+            "encryption_mode":
+                encryption_mode
+        }
+    )
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
@@ -3832,4 +4074,34 @@ def test_sns(request):
         return Response({
             "error": "SMS failed",
             "details": str(e)
+        }, status=500)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def quantum_hardware_bb84(request):
+
+    try:
+        result = run_ibm_bb84()
+
+        return Response({
+            "success": True,
+            "message": "IBM Quantum BB84 experiment completed successfully.",
+            "result": {
+                "backend": result["backend"],
+                "job_id": result["job_id"],
+                "key_agreement": result["key_agreement"],
+                "sifted_key_length": len(
+                    result["bob_sifted_key"]
+                ),
+                "aes_key_length": result["aes_key_length"],
+            }
+        })
+
+    except Exception as e:
+
+        return Response({
+            "success": False,
+            "message": "IBM Quantum BB84 experiment failed.",
+            "error": str(e)
         }, status=500)

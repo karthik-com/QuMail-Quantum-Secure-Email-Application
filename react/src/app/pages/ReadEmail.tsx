@@ -1122,7 +1122,7 @@ const handlePermanentDelete = async () => {
                 </div>
 
                 <h2 className="text-xl font-bold text-center mb-2" style={{ fontFamily: "Orbitron, sans-serif", color: "#3B2A23" }}>OTP Verification</h2>
-                {/* <p className="text-center text-xs mb-1" style={{ color: "#7A6D63", lineHeight: "1.5" }}>An OTP has been sent to your registered email address.</p> */}
+                <p className="text-center text-xs mb-1" style={{ color: "#7A6D63", lineHeight: "1.5" }}>An OTP has been sent to your registered mobile number.</p>
                 <p className="text-center text-xs mb-4" style={{ color: "#A89B91", fontFamily: "JetBrains Mono, monospace" }}>Please enter the verification code below.</p>
 
                 <div className="flex gap-2 justify-center mb-4">
